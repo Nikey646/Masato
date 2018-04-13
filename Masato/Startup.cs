@@ -1,37 +1,53 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Masato.OAuth;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 
-namespace Masato {
-  public class Startup {
-    public Startup(IConfiguration configuration) {
-      Configuration = configuration;
-    }
+namespace Masato
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
 
-    public IConfiguration Configuration { get; }
-    public void ConfigureServices(IServiceCollection services) {
-      services.AddMvc();
-      services.AddSingleton<Data>();
-    }
-    
-    public void Configure(IApplicationBuilder app, IHostingEnvironment env) {
-      if (env.IsDevelopment()) {
-        app.UseDeveloperExceptionPage();
-      }
+        public IConfiguration Configuration { get; }
+        public void ConfigureServices(IServiceCollection services)
+        {
+            if (String.IsNullOrWhiteSpace(Configuration["anilist:clientId"]))
+                throw new InvalidOperationException("Client ID and Client Secret must be configured for Anilist.");
 
-      app.UseForwardedHeaders(new ForwardedHeadersOptions {
-        ForwardedHeaders = ForwardedHeaders.All
-      });
+            services.AddMvc();
+            services.AddSingleton<Data>();
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+              .AddCookie(o => o.LoginPath = new PathString("/login"))
+              .AddAnilist(o =>
+                {
+                    o.ClientId = Configuration["anilist:clientId"];
+                    o.ClientSecret = Configuration["anilist:clientSecret"];
+                });
+        }
 
-      app.UseMvc();
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.All
+            });
+
+            app.UseAuthentication()
+                .UseMvc();
+        }
     }
-  }
 }
